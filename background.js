@@ -8,13 +8,9 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-// Golden Key — кука httpOnly, страница её не видит; отдаём её только своим скриптам расширения.
+// Запросы от своих скриптов: галерея обоев Wallhaven.
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (sender.id !== chrome.runtime.id) return;
-  if (msg?.type === "fph-golden-key") {
-    chrome.cookies.get({ url: "https://funpay.com/", name: "golden_key" }, (c) => reply(c?.value || ""));
-    return true;
-  }
   if (msg?.type === "fph-wallhaven") {
     wallhavenSearch(msg).then(reply, (e) => reply({ error: e.message }));
     return true;

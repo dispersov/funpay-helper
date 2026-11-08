@@ -78,7 +78,6 @@ const FPH_SETTINGS_UI = typeof FPH_THEME === "undefined" ? undefined : (() => {
       { id: "orders", ico: "🛒", name: "Заказы", render: renderOrders },
       { id: "finance", ico: "💳", name: "Финансы", render: renderFinance },
       { id: "buyers", ico: "👤", name: "Покупатели", render: renderBuyers },
-      { id: "api", ico: "🔑", name: "API", render: renderApi },
       { id: "info", ico: "ⓘ", name: "Инфо", render: renderInfo },
     ];
 
@@ -474,26 +473,6 @@ const FPH_SETTINGS_UI = typeof FPH_THEME === "undefined" ? undefined : (() => {
         btn("Импорт", () => file.click()), file),
         h("table", { class: "fs-table" }, h("thead", {}, h("tr", {}, h("th", {}), h("th", {}, "Пользователь"), h("th", {}, "Заметка"), h("th", {}, "Изменена"), h("th", {}))), tbody));
       draw();
-    }
-
-    function renderApi(m) {
-      const field = h("input", { class: "fs-input fs-key", readonly: true, value: "загрузка…" });
-      let key = "";
-      const copy = btn("Скопировать", async () => {
-        if (!key) return;
-        await navigator.clipboard.writeText(key);
-        toast("Golden Key скопирован");
-      }, "fs-primary");
-      m.append(h("div", { class: "fs-h" }, "Авторизация"),
-        h("div", { class: "fs-box" },
-          h("div", { class: "fs-t" }, "Golden Key"),
-          h("p", { class: "fs-muted" }, "Ключ из куки FunPay: его используют боты и другие программы для входа в аккаунт. Он даёт полный доступ к аккаунту — никому его не передавайте."),
-          h("div", { class: "fs-row" }, field, copy)));
-      chrome.runtime.sendMessage({ type: "fph-golden-key" }, (value) => {
-        if (chrome.runtime.lastError || !value) { field.value = "не найден — войдите в аккаунт"; return; }
-        key = value;
-        field.value = key.length > 8 ? key.slice(0, 4) + "•".repeat(12) + key.slice(-4) : "•".repeat(key.length);
-      });
     }
 
     function renderInfo(m) {
