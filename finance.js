@@ -73,6 +73,7 @@ FPH.settings.then((S) => {
   const CACHE = "finance_" + myId();
   let cache = { rows: {}, updated: 0, complete: false };
   let salesOrders = {}; // заказы из статистики продаж — для разбивки по категориям
+  let periodCancelledOrders = [];
   async function load(full) {
     cache = (await chrome.storage.local.get(CACHE))[CACHE] || cache;
     let doc = document, page = 0;
@@ -137,9 +138,10 @@ FPH.settings.then((S) => {
   const place = anchor?.closest(".balances, .page-header") || anchor;
   if (place) place.after(section); else (document.querySelector("#content") || document.body).prepend(section);
 
-  const card = (ico, title, value, sub, cls = "") => el("div", { class: "fph-card " + cls },
+  // Подписи под цифрами не показываем — только название и сумма.
+  const card = (ico, title, value, _sub, cls = "") => el("div", { class: "fph-card " + cls },
     el("div", { class: "fph-card-ico" }, ico),
-    el("div", {}, el("div", { class: "fph-muted" }, title), el("div", { class: "fph-big fph-balance-sensitive" }, value), sub ? el("div", { class: "fph-sub" }, sub) : null));
+    el("div", {}, el("div", { class: "fph-muted" }, title), el("div", { class: "fph-big fph-balance-sensitive" }, value)));
   const money = (v) => fmtMoney(Math.round(v * 100) / 100, "₽");
   const sum = (l) => l.reduce((a, r) => a + r.amount, 0);
   const isOrder = (r) => /заказ/i.test(r.title);
@@ -200,8 +202,11 @@ FPH.settings.then((S) => {
     const avail = isFinite(bal) ? (noHold ? bal : Math.max(0, bal - lockedSum)) : null;
     const next = locked[0];
     top.append(el("div", { class: "fph-cards fph-cards-top" },
-      card("💳", "Баланс", isFinite(bal) ? money(bal) : "—"),
       card("✅", "Можно вывести сейчас", avail != null ? money(avail) : "—", noHold ? "задержки на выводе нет — доступен весь баланс" : "оценка по задержке 48 часов", "fph-card-money"),
+      (() => {
+        const pending = Object.values(salesOrders).filter((o) => o.status === "paid");
+        return card("◷", `В ожидании · ${pending.length} зак.`, money(pending.reduce((a, o) => a + o.price, 0)), null, "fph-card-pending");
+      })(),
       noHold ? null : card("⏳", "Освободится позже", money(lockedSum), next ? `ближайшие ${money(next.amount)} — ${new Date(next.at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "ничего не заморожено")));
   }
 
@@ -216,7 +221,11 @@ FPH.settings.then((S) => {
     const [from, to] = range(period);
     const list = rows.filter((r) => r.status !== "cancel" && r.date >= from && r.date < to);
     if (!list.length) { body.append(el("p", { class: "fph-muted" }, "За выбранный период операций нет.")); return; }
-    ({ cards: tabCards, charts: tabCharts, cats: tabCats, ops: tabOps })[tab](list);
+    // Во вкладке «Операции» показываем и отменённые — чтобы было видно всё, что есть в истории.
+    if (tab === "ops") return tabOps(rows.filter((r) => r.date >= from && r.date < to));
+    // Зачисления по заказам с пометкой «Отменено» FunPay тоже учитывает в балансе (иначе баланс не сходится).
+    periodCancelledOrders = rows.filter((r) => r.status === "cancel" && isOrder(r) && r.date >= from && r.date < to);
+    ({ cards: tabCards, charts: tabCharts, cats: tabCats })[tab](list);
   }
 
   function tabCards(list) {
@@ -228,23 +237,26 @@ FPH.settings.then((S) => {
     const refunds = other.filter((r) => isOrder(r) && salesOrders[orderId(r)]);
     const purchases = other.filter((r) => !refunds.includes(r));
     const days = new Set(list.map((r) => new Date(r.date).toDateString())).size || 1;
+    // «Отмена вывода денег» — это не доход, а возврат отменённого вывода; пополнения — ваши же деньги.
+    const topups = inc.filter((r) => /пополнен/i.test(r.title));
+    const cancelledOrders = periodCancelledOrders;
+    const earned = sum(orders) + sum(refunds) + sum(cancelledOrders); // за продажи, уже за вычетом возвратов
     body.append(el("div", { class: "fph-cards" },
-      card("⬆", "Поступило", money(sum(inc)), `${inc.length} операций`, "fph-card-money"),
+      card("⬆", "Заработано на продажах", money(earned), `зачисления за заказы минус возвраты${cancelledOrders.length ? `, вкл. ${cancelledOrders.length} с пометкой «Отменено»` : ""}`, "fph-card-money"),
       card("🏦", "Выведено", money(-sum(withdraws)), `${withdraws.length} выводов`),
       card("🛒", "Средняя выплата за заказ", money(orders.length ? sum(orders) / orders.length : 0), `${orders.length} заказов`),
-      card("📅", "В среднем за день", money(sum(inc) / days), `дней с операциями: ${days}`),
-      refunds.length ? card("↩", "Возвраты покупателям", money(-sum(refunds)), `${refunds.length} возвратов после зачисления`) : null,
-      purchases.length ? card("🛍", "Покупки на FunPay", money(-sum(purchases)), `${purchases.length} операций (оплата с баланса)`) : null));
+      card("📅", "В среднем за день", money(earned / days), `дней с операциями: ${days}`),
+      topups.length ? card("➕", "Пополнения баланса", money(sum(topups)), `${topups.length} пополнений`) : null));
     const maxOrder = orders.reduce((m, r) => (r.amount > (m?.amount || 0) ? r : m), null);
     const maxW = withdraws.reduce((m, r) => (-r.amount > (m ? -m.amount : 0) ? r : m), null);
     const byDay = new Map();
-    for (const r of inc) { const k = new Date(r.date).toLocaleDateString("ru-RU"); byDay.set(k, (byDay.get(k) || 0) + r.amount); }
+    for (const r of orders) { const k = new Date(r.date).toLocaleDateString("ru-RU"); byDay.set(k, (byDay.get(k) || 0) + r.amount); }
     const best = [...byDay.entries()].sort((a, b) => b[1] - a[1])[0];
     const fact = (ico, label, value) => value ? el("div", { class: "fph-fact" }, el("span", {}, ico), el("span", { class: "fph-muted" }, label + ":"), el("b", {}, value)) : null;
     body.append(el("div", { class: "fph-facts" },
       fact("💎", "Самая большая выплата за заказ", maxOrder && `${money(maxOrder.amount)} (${maxOrder.title})`),
       fact("🏦", "Самый крупный вывод", maxW && `${money(-maxW.amount)} — ${new Date(maxW.date).toLocaleDateString("ru-RU")}`),
-      fact("🔥", "Лучший день по поступлениям", best && `${best[0]} — ${money(best[1])}`)));
+      fact("🔥", "Лучший день по продажам", best && `${best[0]} — ${money(best[1])}`)));
   }
 
   function tabCharts(list) {
@@ -253,7 +265,7 @@ FPH.settings.then((S) => {
     const [from0, to0] = range(period);
     const from = from0 || Math.min(...list.map((r) => r.date));
     const inc = new Map(), outM = new Map();
-    for (const r of list) { const k = key(r.date); if (r.amount > 0) inc.set(k, (inc.get(k) || 0) + r.amount); else outM.set(k, (outM.get(k) || 0) - r.amount); }
+    for (const r of list) { if (/отмена вывода/i.test(r.title)) continue; const k = key(r.date); if (r.amount > 0) inc.set(k, (inc.get(k) || 0) + r.amount); else outM.set(k, (outM.get(k) || 0) - r.amount); }
     const pts = [], d = new Date(key(from)), end = Math.min(Date.now(), to0 - 1);
     while (d.getTime() <= end && pts.length < 400) {
       const k = d.getTime();

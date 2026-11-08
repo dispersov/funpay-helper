@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FunPay Helper",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Свои инструменты для продавца FunPay: темы с обоями и стеклом, заметки о покупателях, массовая правка лотов, статистика продаж.",
   "permissions": [
     "storage",

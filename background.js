@@ -99,6 +99,10 @@ async function checkForUpdate() {
     if (!fphSignature) {
       await chrome.storage.session.set({ fphSignature: now });
     } else if (fphSignature !== now) {
+      // Файлы могли меняться прямо сейчас (правка в процессе) — ждём, пока они перестанут меняться,
+      // иначе Chrome загрузит недописанный файл и автообновление решит, что всё уже свежее.
+      await new Promise((r) => setTimeout(r, 3000));
+      if ((await signature()) !== now) return;
       await chrome.storage.local.set({ fphReloadedAt: Date.now() });
       chrome.runtime.reload();
     }

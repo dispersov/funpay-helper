@@ -159,3 +159,5 @@ html.fph-hide-balance :is(.badge-balance, .balances-value, .fph-balance-sensitiv
 #fph-finance .fph-cards-top .fph-card { background: var(--fph-surface-strong, #fff); -webkit-backdrop-filter: var(--fph-backdrop, none); backdrop-filter: var(--fph-backdrop, none); }
 #fph-finance .fph-sec-body .fph-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { #fph-finance .fph-sec-body .fph-cards { grid-template-columns: 1fr; } }
+
+#fph-finance .fph-card-pending .fph-big { color: var(--fph-accent, #d4a514); }
