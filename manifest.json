@@ -1,0 +1,71 @@
+{
+  "manifest_version": 3,
+  "name": "FunPay Helper",
+  "version": "0.8.0",
+  "description": "Свои инструменты для продавца FunPay: темы с обоями и стеклом, заметки о покупателях, массовая правка лотов, статистика продаж.",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "contextMenus",
+    "cookies",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://funpay.com/*",
+    "https://wallhaven.cc/*",
+    "https://w.wallhaven.cc/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "FunPay Helper"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://funpay.com/*"
+      ],
+      "js": [
+        "theme-core.js",
+        "theme.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://funpay.com/*"
+      ],
+      "css": [
+        "content.css",
+        "settings-ui.css"
+      ],
+      "js": [
+        "settings-ui.js",
+        "common.js",
+        "notes.js",
+        "chatinfo.js",
+        "bulk.js",
+        "offers.js",
+        "stats.js",
+        "finance.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "fonts/*.woff2"
+      ],
+      "matches": [
+        "https://funpay.com/*"
+      ]
+    }
+  ]
+}
